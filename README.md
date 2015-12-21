@@ -2,7 +2,7 @@
 Simple Go dependency injection framework based on modules, module imports and constructors.
 
 ## Usage
-```
+```go
 import (
     "log"
     "github.com/ivankorobkov/di"
@@ -20,7 +20,7 @@ func DbModule(m *di.Module) {
 }
 func HelloModule(m *di.Module) {
     m.Import(DbModule)
-    m.Add(newHelloApp)
+    m.Add(newHelloService)
 }
 
 // Example service with dependencies.
