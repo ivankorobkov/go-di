@@ -1,6 +1,11 @@
 # di
 Simple Go dependency injection framework based on modules, module imports and constructors.
 
+## Installation
+```bash
+go get github.com/ivankorobkov/di
+```
+
 ## Usage
 ```go
 import (
