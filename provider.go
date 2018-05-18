@@ -5,34 +5,36 @@ import (
 	"reflect"
 )
 
-// Constructor is a single type specification in a module.
+// Provider is a single type specification in a module.
 // It has a result type, dependencies, and a function which
 // returns an instance using an object graph for dependencies.
-type Constructor struct {
+type Provider struct {
 	Module *Module
 	Name   string
 	Type   reflect.Type
 	Deps   []reflect.Type
-	Func   func(args []interface{}) interface{}
+	Func   func(args []interface{}) (interface{}, error)
 }
 
-func (c *Constructor) String() string {
+func (c *Provider) String() string {
 	return c.Name
 }
 
 // NewConstructor creates a new constructor from a function with injected dependencies,
 // for example, newServiceZ(ServiceA, ServiceB) ServiceZ.
-func newConstructor(module *Module, f interface{}) *Constructor {
+func newProvider(module *Module, f interface{}) *Provider {
 	fval := reflect.ValueOf(f)
 	if fval.Kind() != reflect.Func {
-		panic(fmt.Sprintf("di: Constructor must be a function: %T", f))
+		panic(fmt.Sprintf("di: provider must be a function: %T", f))
 	}
 	ftyp := fval.Type()
 
 	// Result
-	if ftyp.NumOut() != 1 {
+	switch ftyp.NumOut() {
+	case 1, 2:
+	default:
 		fname := getFuncName(fval)
-		panic(fmt.Sprintf(`di: Constructor must return (result) or (result, error): %v`, fname))
+		panic(fmt.Sprintf(`di: provider must return (instance) or (instance, error): %v`, fname))
 	}
 	rtype := ftyp.Out(0)
 
@@ -43,17 +45,23 @@ func newConstructor(module *Module, f interface{}) *Constructor {
 	}
 
 	// Function
-	function := func(args []interface{}) interface{} {
+	function := func(args []interface{}) (interface{}, error) {
 		argv := []reflect.Value{}
 		for _, arg := range args {
 			argv = append(argv, reflect.ValueOf(arg))
 		}
 
-		result := fval.Call(argv)[0]
-		return result.Interface()
+		out := fval.Call(argv)
+		if len(out) == 1 {
+			return out[0].Interface(), nil
+		}
+
+		result := out[0].Interface()
+		err := out[1].Interface().(error)
+		return result, err
 	}
 
-	return &Constructor{
+	return &Provider{
 		Module: module,
 		Name:   getFuncName(fval),
 		Type:   rtype,
@@ -62,16 +70,15 @@ func newConstructor(module *Module, f interface{}) *Constructor {
 	}
 }
 
-// NewConstructorFromInstance creates a constructor which always returns the same instance.
-func newConstructorFromInstance(module *Module, instance interface{}) *Constructor {
+func newInstanceProvider(module *Module, instance interface{}) *Provider {
 	typ := reflect.TypeOf(instance)
-	return &Constructor{
+	return &Provider{
 		Module: module,
 		Name:   typ.String(),
 		Type:   typ,
 		Deps:   []reflect.Type{},
-		Func: func([]interface{}) interface{} {
-			return instance
+		Func: func([]interface{}) (interface{}, error) {
+			return instance, nil
 		},
 	}
 }
