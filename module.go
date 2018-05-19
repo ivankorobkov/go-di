@@ -5,14 +5,14 @@ import (
 	"reflect"
 )
 
-// ModuleFunc defines a signature for a module provider.
+// ModuleFunc defines a module provider.
 type ModuleFunc func(*Module)
 
 func (m ModuleFunc) Name() string {
 	return getFuncName(reflect.ValueOf(m))
 }
 
-// Module groups providers, dependencies and imported modules.
+// Module groups providers, dependencies and imports.
 type Module struct {
 	Name      string
 	Imports   []ModuleFunc

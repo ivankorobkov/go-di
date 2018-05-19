@@ -5,9 +5,7 @@ import (
 	"reflect"
 )
 
-// Provider is a single type specification in a module.
-// It has a result type, dependencies, and a function which
-// returns an instance using an object graph for dependencies.
+// Provider creates a service instance.
 type Provider struct {
 	Module *Module
 	Name   string
@@ -20,7 +18,7 @@ func (c *Provider) String() string {
 	return c.Name
 }
 
-// NewConstructor creates a new constructor from a function with injected dependencies,
+// newProvider creates a new constructor from a function with injected dependencies,
 // for example, newServiceZ(ServiceA, ServiceB) ServiceZ.
 func newProvider(module *Module, f interface{}) *Provider {
 	fval := reflect.ValueOf(f)

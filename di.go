@@ -9,9 +9,10 @@ import (
 
 // Context is a dependency injection context.
 type Context struct {
-	Modules   map[string]*Module
-	Providers map[reflect.Type]*Provider
-	Instances map[reflect.Type]interface{}
+	Modules       map[string]*Module
+	Providers     map[reflect.Type]*Provider
+	Instances     map[reflect.Type]interface{}
+	InstanceSlice []interface{} // Ordered from dependencies to dependants.
 }
 
 // Inject creates a context and injects dependencies into public struct fields.
@@ -222,6 +223,7 @@ func (ctx *Context) initInstance(typ reflect.Type) (interface{}, error) {
 	}
 
 	ctx.Instances[typ] = instance
+	ctx.InstanceSlice = append(ctx.InstanceSlice, instance)
 	return instance, nil
 }
 
