@@ -2,14 +2,15 @@ package di
 
 import (
 	"context"
+	"log"
 	"os"
 	"os/signal"
 	"time"
 )
 
 const (
-	StartTimeout = 30 * time.Second
-	StopTimeout  = 30 * time.Second
+	StartTimeout = 1 * time.Second
+	StopTimeout  = 1 * time.Second
 )
 
 // Starter is a service which should be started on an application startup.
@@ -23,15 +24,20 @@ type Closer interface {
 	Close() error
 }
 
+// Logger is an application logger.
+type Logger interface {
+	Println(v ...interface{})
+}
+
 // App provides a start/stop lifecycle and a graceful shutdown.
 // Usually, users should call app.Run() which starts the services in toplogical order
 // from dependencies to dependants. Then blocks until a SIGINT/SIGKILL signal arrives,
 // and stops the services in reverse order.
 type App struct {
 	Context      *Context
+	Logger       Logger
 	StartTimeout time.Duration
 	StopTimeout  time.Duration
-	started      []interface{}
 }
 
 // NewApp creates a new application from modules.
@@ -43,6 +49,7 @@ func NewApp(modules ...ModuleFunc) (*App, error) {
 
 	app := &App{
 		Context:      ctx,
+		Logger:       log.New(os.Stderr, "", log.LstdFlags),
 		StartTimeout: StartTimeout,
 		StopTimeout:  StopTimeout,
 	}
@@ -51,23 +58,30 @@ func NewApp(modules ...ModuleFunc) (*App, error) {
 
 // Run starts the application, awaits a stop signal and then stops the application.
 func (app *App) Run() error {
-	// Start the app.
+	if err := app.runStart(); err != nil {
+		app.runStop()
+		return err
+	}
+
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, os.Interrupt, os.Kill)
+	<-ch
+
+	return app.runStop()
+}
+
+func (app *App) runStart() error {
 	startCtx := context.Background()
 	if app.StartTimeout > 0 {
 		var cancel context.CancelFunc
 		startCtx, cancel = context.WithTimeout(startCtx, app.StartTimeout)
 		defer cancel()
 	}
-	if err := app.Start(startCtx); err != nil {
-		return err
-	}
 
-	// Await SIGINT/SIGKILL.
-	ch := make(chan os.Signal, 1)
-	signal.Notify(ch, os.Interrupt, os.Kill)
-	<-ch
+	return app.Start(startCtx)
+}
 
-	// Stop the app.
+func (app *App) runStop() error {
 	stopCtx := context.Background()
 	if app.StopTimeout > 0 {
 		var cancel context.CancelFunc
@@ -79,6 +93,8 @@ func (app *App) Run() error {
 
 // Start starts the services which implement the Starter interface.
 func (app *App) Start(ctx context.Context) error {
+	app.log("Starting...")
+
 	// Find the services which implement the Starter interface.
 	services := []Starter{}
 	for _, instance := range app.Context.InstanceSlice {
@@ -88,34 +104,32 @@ func (app *App) Start(ctx context.Context) error {
 		}
 	}
 
-	// Start the services. On error stop already started in reverse order.
+	// Start the services.
+	var err error
 	for _, service := range services {
-		err := withTimeout(ctx, service.Start)
-		if err == nil {
-			app.started = append(app.started, service)
-			continue
+		if err = withTimeout(ctx, service.Start); err != nil {
+			break
 		}
-		if len(app.started) == 0 {
-			return err
-		}
+	}
 
-		// Stop the started services in reverse order.
-		for i := len(app.started) - 1; i >= 0; i-- {
-			service := app.started[i]
-			closer, ok := service.(Closer)
-			if !ok {
-				continue
-			}
-			withTimeout(ctx, closer.Close)
-		}
+	switch {
+	case ctx.Err() == err && err == context.DeadlineExceeded:
+		app.log("Start timed out.")
+		return err
+
+	case err != nil:
+		app.log("Failed to start:", err)
 		return err
 	}
 
+	app.log("Started.")
 	return nil
 }
 
 // Stop stops the services which implement the Closer interface.
 func (app *App) Stop(ctx context.Context) error {
+	app.log("Stopping...")
+
 	// Find the services which implement the Closer interface.
 	services := []Closer{}
 	for _, instance := range app.Context.InstanceSlice {
@@ -126,10 +140,33 @@ func (app *App) Stop(ctx context.Context) error {
 	}
 
 	// Close the services.
+	var err error = nil
 	for _, service := range services {
-		withTimeout(ctx, service.Close)
+		if stopErr := withTimeout(ctx, service.Close); stopErr != nil {
+			if err == nil {
+				err = stopErr
+			}
+		}
 	}
+
+	switch {
+	case ctx.Err() == err && err == context.DeadlineExceeded:
+		app.log("Stop timed out.")
+		return nil
+	case err != nil:
+		app.log("Failed to stop cleanly:", err)
+		return err
+	}
+
+	app.log("Stopped.")
 	return nil
+}
+
+func (app *App) log(v ...interface{}) {
+	if app.Logger == nil {
+		return
+	}
+	app.Logger.Println(v...)
 }
 
 func withTimeout(ctx context.Context, fn func() error) error {
