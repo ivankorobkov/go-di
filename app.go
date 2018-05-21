@@ -9,19 +9,18 @@ import (
 )
 
 const (
-	StartTimeout = 1 * time.Second
-	StopTimeout  = 1 * time.Second
+	StartTimeout = 30 * time.Second
+	StopTimeout  = 30 * time.Second
 )
 
 // Starter is a service which should be started on an application startup.
-// The opposite is Closer.
 type Starter interface {
 	Start() error
 }
 
-// Closer is a service which should be closed on an application shutdown.
-type Closer interface {
-	Close() error
+// Stopper is a service which should be stopped on an application shutdown.
+type Stopper interface {
+	Stop() error
 }
 
 // Logger is an application logger.
@@ -77,7 +76,6 @@ func (app *App) runStart() error {
 		startCtx, cancel = context.WithTimeout(startCtx, app.StartTimeout)
 		defer cancel()
 	}
-
 	return app.Start(startCtx)
 }
 
@@ -126,14 +124,14 @@ func (app *App) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop stops the services which implement the Closer interface.
+// Stop stops the services which implement the Stopper interface.
 func (app *App) Stop(ctx context.Context) error {
 	app.log("Stopping...")
 
-	// Find the services which implement the Closer interface.
-	services := []Closer{}
+	// Find the services which implement the Stopper interface.
+	services := []Stopper{}
 	for _, instance := range app.Context.InstanceSlice {
-		service, ok := instance.(Closer)
+		service, ok := instance.(Stopper)
 		if ok {
 			services = append(services, service)
 		}
@@ -142,7 +140,7 @@ func (app *App) Stop(ctx context.Context) error {
 	// Close the services.
 	var err error = nil
 	for _, service := range services {
-		if stopErr := withTimeout(ctx, service.Close); stopErr != nil {
+		if stopErr := withTimeout(ctx, service.Stop); stopErr != nil {
 			if err == nil {
 				err = stopErr
 			}
