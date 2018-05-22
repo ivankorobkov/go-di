@@ -80,6 +80,20 @@ func Test_NewContext__should_return_provider_error_if_any(t *testing.T) {
 	assert.Equal(t, testErr, err)
 }
 
+func Test_NewContext__should_return_nil_error_from_provider(t *testing.T) {
+	ctx, err := NewContext(func(m *Module) {
+		m.Add(func() (string, error) { return "hello", nil })
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	str := ""
+	ctx.MustGet(&str)
+
+	assert.Equal(t, "hello", str)
+}
+
 func Test_Context_Get__should_get_instance_from_context(t *testing.T) {
 	ctx, err := NewContext(func(m *Module) {
 		m.AddInstance("hello")

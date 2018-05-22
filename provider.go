@@ -55,8 +55,11 @@ func newProvider(module *Module, f interface{}) *Provider {
 		}
 
 		result := out[0].Interface()
-		err := out[1].Interface().(error)
-		return result, err
+		err := out[1].Interface()
+		if err != nil {
+			return result, err.(error)
+		}
+		return result, nil
 	}
 
 	return &Provider{

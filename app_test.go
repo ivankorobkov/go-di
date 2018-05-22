@@ -9,7 +9,7 @@ import (
 
 type testAppService struct {
 	started bool
-	closed  bool
+	stopped bool
 }
 
 func (s *testAppService) Start() error {
@@ -17,8 +17,8 @@ func (s *testAppService) Start() error {
 	return nil
 }
 
-func (s *testAppService) Close() error {
-	s.closed = true
+func (s *testAppService) Stop() error {
+	s.stopped = true
 	return nil
 }
 
@@ -35,7 +35,7 @@ func Test_App_Start__should_start_services(t *testing.T) {
 	assert.True(t, service.started)
 }
 
-func Test_App_Stop__should_close_services(t *testing.T) {
+func Test_App_Stop__should_stop_services(t *testing.T) {
 	service := &testAppService{}
 	app, err := NewApp(func(m *Module) { m.AddInstance(service) })
 	if err != nil {
@@ -45,5 +45,5 @@ func Test_App_Stop__should_close_services(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.True(t, service.closed)
+	assert.True(t, service.stopped)
 }
