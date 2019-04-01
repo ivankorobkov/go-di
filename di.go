@@ -187,15 +187,15 @@ func (ctx *Context) initProviders() error {
 		}
 
 		// Check provider dependencies.
-		for _, p := range m.Providers {
-			for _, dep := range p.Deps {
-				if _, ok := availableDeps[dep]; !ok {
-					return fmt.Errorf(
-						"di: unresolved provider dependency, dep=%v, provider=%v, module=%v",
-						dep, p, m.Name)
-				}
-			}
-		}
+		// for _, p := range m.Providers {
+		// 	for _, dep := range p.Deps {
+		// 		if _, ok := availableDeps[dep]; !ok {
+		// 			return fmt.Errorf(
+		// 				"di: unresolved provider dependency, dep=%v, provider=%v, module=%v",
+		// 				dep, p, m.Name)
+		// 		}
+		// 	}
+		// }
 	}
 
 	return nil
