@@ -16,8 +16,8 @@ type Context struct {
 }
 
 // Inject creates a context and injects dependencies into public struct fields.
-func Inject(dstPtr interface{}, mfuncs ...ModuleFunc) error {
-	ctx, err := NewContext(mfuncs...)
+func Inject(dstPtr interface{}, depOrMods ...interface{}) error {
+	ctx, err := NewContext(depOrMods...)
 	if err != nil {
 		return err
 	}
@@ -27,21 +27,35 @@ func Inject(dstPtr interface{}, mfuncs ...ModuleFunc) error {
 }
 
 // MustInject creates a context and injects dependencies into public struct fields, or panics on an error.
-func MustInject(dstPtr interface{}, mfuncs ...ModuleFunc) {
-	if err := Inject(dstPtr, mfuncs...); err != nil {
+func MustInject(dstPtr interface{}, depOrMods ...interface{}) {
+	if err := Inject(dstPtr, depOrMods...); err != nil {
 		panic(err)
 	}
 }
 
 // NewContext creates a context and initializes all instances from its providers.
-func NewContext(mfuncs ...ModuleFunc) (*Context, error) {
+func NewContext(depOrMods ...interface{}) (*Context, error) {
 	ctx := &Context{
 		Modules:   make(map[string]*Module),
 		Providers: make(map[reflect.Type]*Provider),
 		Instances: make(map[reflect.Type]interface{}),
 	}
 
-	if err := ctx.initModules(mfuncs); err != nil {
+	mods := make([]ModuleFunc, 0, len(depOrMods))
+	for _, depOrMod := range depOrMods {
+		mod, ok := depOrMod.(func(*Module))
+		if ok {
+			mods = append(mods, mod)
+		} else {
+			dep := depOrMod
+			mod := func(m *Module) {
+				m.AddInstance(dep)
+			}
+			mods = append(mods, mod)
+		}
+	}
+
+	if err := ctx.initModules(mods); err != nil {
 		return nil, err
 	}
 	if err := ctx.initProviders(); err != nil {

@@ -40,8 +40,8 @@ type App struct {
 }
 
 // NewApp creates a new application from modules.
-func NewApp(modules ...ModuleFunc) (*App, error) {
-	ctx, err := NewContext(modules...)
+func NewApp(depOrMods ...interface{}) (*App, error) {
+	ctx, err := NewContext(depOrMods...)
 	if err != nil {
 		return nil, err
 	}
